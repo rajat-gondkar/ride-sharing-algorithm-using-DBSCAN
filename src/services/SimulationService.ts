@@ -26,15 +26,32 @@ export class SimulationService implements ISimulationService {
       maxLng: -73.9
     };
     
-    // Generate random requests and vehicles
+    // Generate random requests first
     const requests = this.dataAdapter.generateRequests(params.passengerCount, bounds);
-    const vehicles = this.dataAdapter.generateVehicles(params.vehicleCount, bounds);
+    
+    console.log(`Generated ${requests.length} passengers`);
+    
+    // Generate vehicles positioned near the actual passenger clusters
+    const vehicles = this.dataAdapter.generateVehiclesNearPassengers(params.vehicleCount, requests, bounds);
+    
+    console.log(`Generated ${vehicles.length} vehicles near passenger clusters`);
     
     // Apply clustering to requests
     const clusters = this.clusteringStrategy.cluster(requests, {
       timeWindowMinutes: params.timeWindow,
       maxDistanceKm: params.maxDetourDistance
     });
+    
+    // Log clustering results
+    const multiPassengerClusters = clusters.filter(c => c.requests.length > 1);
+    const singlePassengerClusters = clusters.filter(c => c.requests.length === 1);
+    const totalClusteredPassengers = multiPassengerClusters.reduce((sum, c) => sum + c.requests.length, 0);
+    
+    console.log(`Clustering Results:`);
+    console.log(`- Total clusters: ${clusters.length}`);
+    console.log(`- Multi-passenger clusters: ${multiPassengerClusters.length}`);
+    console.log(`- Single-passenger clusters (noise): ${singlePassengerClusters.length}`);
+    console.log(`- Passengers in clusters: ${totalClusteredPassengers}/${requests.length} (${(totalClusteredPassengers/requests.length*100).toFixed(1)}%)`);
     
     // Match clusters to vehicles
     const assignments = this.matchingStrategy.match(clusters, vehicles, {

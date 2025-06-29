@@ -20,8 +20,8 @@ export class DBSCANClustering implements IClusterStrategy {
   private readonly NOISE = -2;
   
   // Distance normalization (for combining spatial and temporal distances)
-  private readonly MAX_SPATIAL_DISTANCE_KM = 10; // Normalize to max 10km
-  private readonly MAX_TEMPORAL_DISTANCE_MIN = 30; // Normalize to max 30 minutes
+  private readonly MAX_SPATIAL_DISTANCE_KM = 4; // Normalize to max 4km (adjusted for more realistic clusters)
+  private readonly MAX_TEMPORAL_DISTANCE_MIN = 12; // Normalize to max 12 minutes (adjusted for more realistic temporal clustering)
 
   /**
    * Cluster ride requests using DBSCAN algorithm
@@ -41,8 +41,8 @@ export class DBSCANClustering implements IClusterStrategy {
       return [];
     }
     
-    // DBSCAN parameters
-    const epsilon = 0.3; // Epsilon defines the radius of the neighborhood (normalized value)
+    // DBSCAN parameters - adjusted for more realistic clustering
+    const epsilon = 0.22; // Epsilon defines the radius of the neighborhood (adjusted for more realistic clusters)
     const minPoints = 2; // Minimum points in a neighborhood to form a cluster
     
     // Initialize clusters and classification array
@@ -242,7 +242,7 @@ export class DBSCANClustering implements IClusterStrategy {
     );
     
     // Combine spatial and temporal distances (with spatial having more weight)
-    // Weight distribution: 70% spatial, 30% temporal
-    return (normalizedSpatialDistance * 0.7) + (normalizedTemporalDistance * 0.3);
+    // Weight distribution: 80% spatial, 20% temporal (increased spatial weight for clustered data)
+    return (normalizedSpatialDistance * 0.8) + (normalizedTemporalDistance * 0.2);
   }
 } 

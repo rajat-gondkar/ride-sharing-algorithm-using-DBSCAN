@@ -4,6 +4,7 @@ import { Cluster, RideRequest, Vehicle, Assignment, Coordinates, SimulationParam
 export interface IDataAdapter {
   generateRequests(count: number, bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }): RideRequest[];
   generateVehicles(count: number, bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }): Vehicle[];
+  generateVehiclesNearPassengers(count: number, requests: RideRequest[], bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }): Vehicle[];
 }
 
 // Parameters for clustering
