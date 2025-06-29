@@ -111,121 +111,121 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
             <Box sx={{ flex: { xs: 1, md: 1 } }}>
-              <Box sx={{ my: 2 }}>
-                <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                  <PeopleAltIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
-                  Passenger Count: <Badge 
-                    color="primary" 
-                    badgeContent={passengerCount} 
-                    sx={{ ml: 1 }}
-                    max={999}
-                  />
-                </Typography>
-                <Slider
-                  value={passengerCount}
-                  onChange={(_, value) => setPassengerCount(value as number)}
-                  min={DEFAULT_SIMULATION_CONFIG.MIN_PASSENGERS}
-                  max={DEFAULT_SIMULATION_CONFIG.MAX_PASSENGERS}
-                  valueLabelDisplay="auto"
-                  disabled={simulationRunning}
-                  sx={{ 
-                    color: theme.palette.primary.main,
-                    '& .MuiSlider-thumb': {
-                      '&:hover, &.Mui-focusVisible': {
-                        boxShadow: `0px 0px 0px 8px ${alpha(theme.palette.primary.main, 0.16)}`
-                      }
-                    }
-                  }}
+            <Box sx={{ my: 2 }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <PeopleAltIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+                Passenger Count: <Badge 
+                  color="primary" 
+                  badgeContent={passengerCount} 
+                  sx={{ ml: 1 }}
+                  max={999}
                 />
-              </Box>
-              
-              <Box sx={{ my: 2 }}>
-                <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                  <DirectionsCarIcon sx={{ mr: 1, color: theme.palette.secondary.main }} />
-                  Vehicle Count: <Badge 
-                    color="secondary" 
-                    badgeContent={vehicleCount} 
-                    sx={{ ml: 1 }}
-                    max={999}
-                  />
-                </Typography>
-                <Slider
-                  value={vehicleCount}
-                  onChange={(_, value) => setVehicleCount(value as number)}
-                  min={DEFAULT_SIMULATION_CONFIG.MIN_VEHICLES}
-                  max={DEFAULT_SIMULATION_CONFIG.MAX_VEHICLES}
-                  valueLabelDisplay="auto"
-                  disabled={simulationRunning}
-                  sx={{ 
-                    color: theme.palette.secondary.main,
-                    '& .MuiSlider-thumb': {
-                      '&:hover, &.Mui-focusVisible': {
-                        boxShadow: `0px 0px 0px 8px ${alpha(theme.palette.secondary.main, 0.16)}`
-                      }
+              </Typography>
+              <Slider
+                value={passengerCount}
+                onChange={(_, value) => setPassengerCount(value as number)}
+                min={DEFAULT_SIMULATION_CONFIG.MIN_PASSENGERS}
+                max={DEFAULT_SIMULATION_CONFIG.MAX_PASSENGERS}
+                valueLabelDisplay="auto"
+                disabled={simulationRunning}
+                sx={{ 
+                  color: theme.palette.primary.main,
+                  '& .MuiSlider-thumb': {
+                    '&:hover, &.Mui-focusVisible': {
+                      boxShadow: `0px 0px 0px 8px ${alpha(theme.palette.primary.main, 0.16)}`
                     }
-                  }}
-                />
-              </Box>
+                  }
+                }}
+              />
             </Box>
             
+            <Box sx={{ my: 2 }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <DirectionsCarIcon sx={{ mr: 1, color: theme.palette.secondary.main }} />
+                Vehicle Count: <Badge 
+                  color="secondary" 
+                  badgeContent={vehicleCount} 
+                  sx={{ ml: 1 }}
+                  max={999}
+                />
+              </Typography>
+              <Slider
+                value={vehicleCount}
+                onChange={(_, value) => setVehicleCount(value as number)}
+                min={DEFAULT_SIMULATION_CONFIG.MIN_VEHICLES}
+                max={DEFAULT_SIMULATION_CONFIG.MAX_VEHICLES}
+                valueLabelDisplay="auto"
+                disabled={simulationRunning}
+                sx={{ 
+                  color: theme.palette.secondary.main,
+                  '& .MuiSlider-thumb': {
+                    '&:hover, &.Mui-focusVisible': {
+                      boxShadow: `0px 0px 0px 8px ${alpha(theme.palette.secondary.main, 0.16)}`
+                    }
+                  }
+                }}
+              />
+            </Box>
+            </Box>
+          
             <Box sx={{ flex: { xs: 1, md: 1 } }}>
-              <Box sx={{ my: 2 }}>
-                <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                  <RouteIcon sx={{ mr: 1, color: theme.palette.success.main }} />
-                  Max Detour Distance (km): <Badge 
-                    color="success" 
-                    badgeContent={maxDetourDistance.toFixed(1)} 
-                    sx={{ ml: 1 }}
-                    max={999}
-                  />
-                </Typography>
-                <Slider
-                  value={maxDetourDistance}
-                  onChange={(_, value) => setMaxDetourDistance(value as number)}
-                  min={0.5}
-                  max={5.0}
-                  step={0.1}
-                  valueLabelDisplay="auto"
-                  disabled={simulationRunning}
-                  sx={{ 
-                    color: theme.palette.success.main,
-                    '& .MuiSlider-thumb': {
-                      '&:hover, &.Mui-focusVisible': {
-                        boxShadow: `0px 0px 0px 8px ${alpha(theme.palette.success.main, 0.16)}`
-                      }
-                    }
-                  }}
+            <Box sx={{ my: 2 }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <RouteIcon sx={{ mr: 1, color: theme.palette.success.main }} />
+                Max Detour Distance (km): <Badge 
+                  color="success" 
+                  badgeContent={maxDetourDistance.toFixed(1)} 
+                  sx={{ ml: 1 }}
+                  max={999}
                 />
-              </Box>
-              
-              <Box sx={{ my: 2 }}>
-                <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                  <TimerIcon sx={{ mr: 1, color: theme.palette.info.main }} />
-                  Time Window (minutes): <Badge 
-                    color="info" 
-                    badgeContent={timeWindow} 
-                    sx={{ ml: 1 }}
-                    max={999}
-                  />
-                </Typography>
-                <Slider
-                  value={timeWindow}
-                  onChange={(_, value) => setTimeWindow(value as number)}
-                  min={5}
-                  max={30}
-                  step={1}
-                  valueLabelDisplay="auto"
-                  disabled={simulationRunning}
-                  sx={{ 
-                    color: theme.palette.info.main,
-                    '& .MuiSlider-thumb': {
-                      '&:hover, &.Mui-focusVisible': {
-                        boxShadow: `0px 0px 0px 8px ${alpha(theme.palette.info.main, 0.16)}`
-                      }
+              </Typography>
+              <Slider
+                value={maxDetourDistance}
+                onChange={(_, value) => setMaxDetourDistance(value as number)}
+                min={0.5}
+                max={5.0}
+                step={0.1}
+                valueLabelDisplay="auto"
+                disabled={simulationRunning}
+                sx={{ 
+                  color: theme.palette.success.main,
+                  '& .MuiSlider-thumb': {
+                    '&:hover, &.Mui-focusVisible': {
+                      boxShadow: `0px 0px 0px 8px ${alpha(theme.palette.success.main, 0.16)}`
                     }
-                  }}
+                  }
+                }}
+              />
+            </Box>
+            
+            <Box sx={{ my: 2 }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <TimerIcon sx={{ mr: 1, color: theme.palette.info.main }} />
+                Time Window (minutes): <Badge 
+                  color="info" 
+                  badgeContent={timeWindow} 
+                  sx={{ ml: 1 }}
+                  max={999}
                 />
-              </Box>
+              </Typography>
+              <Slider
+                value={timeWindow}
+                onChange={(_, value) => setTimeWindow(value as number)}
+                min={5}
+                max={30}
+                step={1}
+                valueLabelDisplay="auto"
+                disabled={simulationRunning}
+                sx={{ 
+                  color: theme.palette.info.main,
+                  '& .MuiSlider-thumb': {
+                    '&:hover, &.Mui-focusVisible': {
+                      boxShadow: `0px 0px 0px 8px ${alpha(theme.palette.info.main, 0.16)}`
+                    }
+                  }
+                }}
+              />
+            </Box>
             </Box>
           </Box>
 
@@ -339,7 +339,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         <TrendingDownIcon sx={{ color: theme.palette.secondary.main, mr: 1 }} />
                         <Typography variant="h6" sx={{ color: theme.palette.secondary.main, fontWeight: 600 }}>
                           {metrics.averageDetourDistance.toFixed(2)} km
-                        </Typography>
+                      </Typography>
                       </Box>
                       <Typography variant="body2" color="textSecondary">
                         Avg Detour Distance

@@ -1,6 +1,6 @@
 import { ISimulationService } from './interfaces';
 import { IDataAdapter, IClusterStrategy, IMatchingStrategy, IRoutingEngine } from './interfaces';
-import { SimulationParams, RideRequest, Vehicle, Cluster, Assignment } from '../models/types';
+import { SimulationParams, RideRequest, Vehicle, Cluster, Assignment, Coordinates } from '../models/types';
 import { haversineDistance } from '../utils/geo';
 
 export class SimulationService implements ISimulationService {
@@ -89,7 +89,7 @@ export class SimulationService implements ISimulationService {
     // Calculate average detour distance (simplified for MVP)
     // In a real implementation, this would use the routing engine
     let totalDetourDistance = 0;
-    let totalDirectDistance = 0;
+    let totalSequentialDistance = 0; // Realistic sequential route distance
     let sharedRideCount = 0;
     
     assignments.forEach(assignment => {
@@ -98,37 +98,69 @@ export class SimulationService implements ISimulationService {
       // Skip assignments with invalid routes
       if (route.length < 2) return;
       
-      // Calculate actual route distance
-      let routeDistance = 0;
+      // Calculate actual optimized route distance
+      let optimizedRouteDistance = 0;
       for (let i = 0; i < route.length - 1; i++) {
-        routeDistance += haversineDistance(route[i], route[i + 1]);
+        optimizedRouteDistance += haversineDistance(route[i], route[i + 1]);
       }
       
-      // Calculate direct distances (vehicle to each passenger's destination)
+      // Calculate realistic sequential route distance
+      // This simulates what would happen if the vehicle had to pick up and drop off passengers one by one
       const matchedRequests = requests.filter(req => assignment.requestIds.includes(req.id));
+      const sequentialDistance = this.calculateSequentialRouteDistance(route[0], matchedRequests);
+      totalSequentialDistance += sequentialDistance;
       
-      matchedRequests.forEach(request => {
-        const directDistance = haversineDistance(route[0], request.dropoffLocation);
-        totalDirectDistance += directDistance;
-      });
-      
-      totalDetourDistance += routeDistance;
+      totalDetourDistance += optimizedRouteDistance;
       sharedRideCount += matchedRequests.length;
     });
     
     // Calculate average detour distance per passenger
     const averageDetourDistance = sharedRideCount > 0
-      ? (totalDetourDistance - totalDirectDistance) / sharedRideCount
+      ? (totalDetourDistance - totalSequentialDistance) / sharedRideCount
       : 0;
     
-    // Estimate distance saved through ride-sharing
-    // If each passenger took individual trips vs. shared routes
-    const totalDistanceSaved = totalDirectDistance - totalDetourDistance;
+    // Realistic distance saved calculation (sequential vs optimized route)
+    const totalDistanceSaved = totalSequentialDistance - totalDetourDistance;
     
     return {
       percentageMatched,
       averageDetourDistance,
       totalDistanceSaved
     };
+  }
+
+  /**
+   * Calculate the distance for a realistic sequential pickup/dropoff route
+   * This simulates what would happen if the vehicle had to serve passengers one by one
+   * 
+   * Route pattern: Vehicle → Pickup1 → Dropoff1 → Pickup2 → Dropoff2 → Pickup3 → Dropoff3...
+   * 
+   * @param vehicleLocation Starting location of the vehicle
+   * @param requests Array of ride requests to be served
+   * @returns Total distance for the sequential route
+   */
+  private calculateSequentialRouteDistance(vehicleLocation: Coordinates, requests: RideRequest[]): number {
+    if (requests.length === 0) return 0;
+    
+    let totalDistance = 0;
+    let currentLocation = vehicleLocation;
+    
+    // Sort requests by pickup time for more realistic sequencing
+    const sortedRequests = [...requests].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    
+    for (const request of sortedRequests) {
+      // Vehicle travels from current location to pickup
+      const pickupDistance = haversineDistance(currentLocation, request.pickupLocation);
+      totalDistance += pickupDistance;
+      
+      // Vehicle travels from pickup to dropoff
+      const dropoffDistance = haversineDistance(request.pickupLocation, request.dropoffLocation);
+      totalDistance += dropoffDistance;
+      
+      // Update current location to dropoff point
+      currentLocation = request.dropoffLocation;
+    }
+    
+    return totalDistance;
   }
 } 
