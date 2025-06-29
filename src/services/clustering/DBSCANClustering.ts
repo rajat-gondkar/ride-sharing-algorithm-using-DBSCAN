@@ -54,6 +54,9 @@ export class DBSCANClustering implements IClusterStrategy {
     const clusters: Cluster[] = [];
     const classifications: number[] = new Array(filteredRequests.length).fill(this.UNCLASSIFIED);
     
+    // Track noise points that get absorbed into clusters
+    const absorbedNoisePoints: number[] = [];
+    
     // Run DBSCAN algorithm
     let clusterId = 0;
     
@@ -69,15 +72,17 @@ export class DBSCANClustering implements IClusterStrategy {
       // Check if point is a core point (has enough neighbors)
       if (neighborIndices.length < minPoints) {
         classifications[i] = this.NOISE;
+        console.log(`Point ${i} marked as NOISE (${neighborIndices.length} neighbors)`);
         continue;
       }
       
       // Start a new cluster
       clusterId++;
       classifications[i] = clusterId;
+      console.log(`Starting cluster ${clusterId} from point ${i} with ${neighborIndices.length} neighbors`);
       
       // Expand the cluster
-      this.expandCluster(i, neighborIndices, clusterId, classifications, filteredRequests, epsilon, minPoints, params);
+      this.expandCluster(i, neighborIndices, clusterId, classifications, filteredRequests, epsilon, minPoints, params, absorbedNoisePoints);
     }
     
     // Convert classification results to cluster objects
@@ -112,9 +117,11 @@ export class DBSCANClustering implements IClusterStrategy {
       .map(item => item.idx);
     
     console.log(`DBSCAN Results: ${clusterId} clusters, ${noiseIndices.length} noise points out of ${filteredRequests.length} total requests`);
+    console.log(`Absorbed noise points: ${absorbedNoisePoints.length}`);
     
     for (const idx of noiseIndices) {
       const request = filteredRequests[idx];
+      console.log(`Creating single-passenger cluster for noise point ${idx}`);
       clusters.push({
         id: uuidv4(),
         centroid: { ...request.pickupLocation },
@@ -122,7 +129,36 @@ export class DBSCANClustering implements IClusterStrategy {
       });
     }
     
+    // Final verification: ensure all requests are accounted for
+    const totalClusteredRequests = clusters.reduce((sum, cluster) => sum + cluster.requests.length, 0);
+    const unaccountedRequests = filteredRequests.length - totalClusteredRequests;
+    
+    if (unaccountedRequests > 0) {
+      console.warn(`WARNING: ${unaccountedRequests} requests are not accounted for in any cluster!`);
+      
+      // Find unaccounted requests
+      const clusteredRequestIds = new Set(clusters.flatMap(c => c.requests.map(r => r.id)));
+      const unaccountedIndices = filteredRequests
+        .map((req, idx) => ({ req, idx }))
+        .filter(({ req }) => !clusteredRequestIds.has(req.id))
+        .map(({ idx }) => idx);
+      
+      console.warn(`Unaccounted request indices: ${unaccountedIndices.join(', ')}`);
+      
+      // Create individual clusters for unaccounted requests
+      for (const idx of unaccountedIndices) {
+        const request = filteredRequests[idx];
+        console.log(`Creating emergency single-passenger cluster for unaccounted request ${idx}`);
+        clusters.push({
+          id: uuidv4(),
+          centroid: { ...request.pickupLocation },
+          requests: [request]
+        });
+      }
+    }
+    
     console.log(`Final clusters: ${clusters.length} total (${clusterId} multi-passenger + ${noiseIndices.length} single-passenger)`);
+    console.log(`Total requests in clusters: ${totalClusteredRequests}/${filteredRequests.length}`);
     
     return clusters;
   }
@@ -166,7 +202,8 @@ export class DBSCANClustering implements IClusterStrategy {
     requests: RideRequest[],
     epsilon: number,
     minPoints: number,
-    params: ClusterParams
+    params: ClusterParams,
+    absorbedNoisePoints: number[]
   ): void {
     // Process all seeds (neighbors of the core point)
     let seeds = [...neighborIndices];
@@ -178,11 +215,14 @@ export class DBSCANClustering implements IClusterStrategy {
       // If point was noise, add it to the current cluster
       if (classifications[currentPointIndex] === this.NOISE) {
         classifications[currentPointIndex] = clusterId;
+        absorbedNoisePoints.push(currentPointIndex);
+        console.log(`Noise point ${currentPointIndex} absorbed into cluster ${clusterId}`);
       }
       
       // If point is not yet classified, add it to the current cluster
       if (classifications[currentPointIndex] === this.UNCLASSIFIED) {
         classifications[currentPointIndex] = clusterId;
+        console.log(`Unclassified point ${currentPointIndex} added to cluster ${clusterId}`);
         
         // Find all neighbors of the current point
         const currentNeighbors = this.regionQuery(
@@ -194,6 +234,7 @@ export class DBSCANClustering implements IClusterStrategy {
         
         // If current point is a core point, add its neighbors to the seeds list
         if (currentNeighbors.length >= minPoints) {
+          console.log(`Point ${currentPointIndex} is a core point with ${currentNeighbors.length} neighbors, expanding cluster`);
           seeds = this.mergeArrays(seeds, currentNeighbors);
         }
       }
