@@ -55,8 +55,11 @@ export class GeneticMatcher implements IMatchingStrategy {
       }
     }
     
-    // Convert the best solution to assignments
-    return this.solutionToAssignments(bestSolution, clusters, vehicles);
+    // Post-process: Assign idle vehicles to unassigned clusters
+    const improvedSolution = this.postProcessSolution(bestSolution, clusters, vehicles, constraints);
+    
+    // Convert the improved solution to assignments
+    return this.solutionToAssignments(improvedSolution, clusters, vehicles);
   }
   
   /**
@@ -81,31 +84,70 @@ export class GeneticMatcher implements IMatchingStrategy {
         availableSeats: v.availableSeats
       }));
       
-      // Randomly assign clusters to vehicles
-      for (let j = 0; j < clusters.length; j++) {
-        const clusterSize = clusters[j].requests.length;
-        
-        // Find vehicles with enough capacity
-        const eligibleVehicles = availableVehicles
-          .map((vehicle, index) => ({ vehicle, index }))
-          .filter(({ vehicle }) => vehicle.availableSeats >= clusterSize);
-        
-        if (eligibleVehicles.length > 0) {
-          // Randomly select a vehicle
-          const randomIndex = Math.floor(Math.random() * eligibleVehicles.length);
-          const selectedVehicle = eligibleVehicles[randomIndex];
+      // For some solutions, prioritize greedy assignment to maximize matching
+      const useGreedyAssignment = i < this.POPULATION_SIZE * 0.3; // 30% greedy solutions
+      
+      if (useGreedyAssignment) {
+        // Greedy assignment: assign clusters to nearest available vehicle
+        for (let j = 0; j < clusters.length; j++) {
+          const clusterSize = clusters[j].requests.length;
           
-          // Check distance constraint
-          const distance = haversineDistance(
-            selectedVehicle.vehicle.location,
-            clusters[j].centroid
-          );
+          // Find vehicles with enough capacity
+          const eligibleVehicles = availableVehicles
+            .map((vehicle, index) => ({ vehicle, index }))
+            .filter(({ vehicle }) => vehicle.availableSeats >= clusterSize);
           
-          if (distance <= constraints.maxDetourKm) {
-            // Assign cluster to vehicle
-            solution[j] = selectedVehicle.index;
-            // Update vehicle capacity
-            availableVehicles[selectedVehicle.index].availableSeats -= clusterSize;
+          if (eligibleVehicles.length > 0) {
+            // Find the nearest eligible vehicle
+            let bestVehicleIndex = -1;
+            let bestDistance = Infinity;
+            
+            for (const { vehicle, index } of eligibleVehicles) {
+              const distance = haversineDistance(
+                vehicle.location,
+                clusters[j].centroid
+              );
+              
+              if (distance <= constraints.maxDetourKm && distance < bestDistance) {
+                bestVehicleIndex = index;
+                bestDistance = distance;
+              }
+            }
+            
+            // Assign to best vehicle if found
+            if (bestVehicleIndex !== -1) {
+              solution[j] = bestVehicleIndex;
+              availableVehicles[bestVehicleIndex].availableSeats -= clusterSize;
+            }
+          }
+        }
+      } else {
+        // Random assignment (original logic)
+        for (let j = 0; j < clusters.length; j++) {
+          const clusterSize = clusters[j].requests.length;
+          
+          // Find vehicles with enough capacity
+          const eligibleVehicles = availableVehicles
+            .map((vehicle, index) => ({ vehicle, index }))
+            .filter(({ vehicle }) => vehicle.availableSeats >= clusterSize);
+          
+          if (eligibleVehicles.length > 0) {
+            // Randomly select a vehicle
+            const randomIndex = Math.floor(Math.random() * eligibleVehicles.length);
+            const selectedVehicle = eligibleVehicles[randomIndex];
+            
+            // Check distance constraint
+            const distance = haversineDistance(
+              selectedVehicle.vehicle.location,
+              clusters[j].centroid
+            );
+            
+            if (distance <= constraints.maxDetourKm) {
+              // Assign cluster to vehicle
+              solution[j] = selectedVehicle.index;
+              // Update vehicle capacity
+              availableVehicles[selectedVehicle.index].availableSeats -= clusterSize;
+            }
           }
         }
       }
@@ -338,7 +380,6 @@ export class GeneticMatcher implements IMatchingStrategy {
   ): number {
     // Calculate various metrics
     let totalAssigned = 0;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let totalDistance = 0;
     let totalDetour = 0;
     
@@ -407,10 +448,6 @@ export class GeneticMatcher implements IMatchingStrategy {
     }
     
     // Calculate fitness score - weighted combination of objectives
-    // 1. Maximize number of assigned passengers
-    // 2. Minimize total detour
-    // 3. Minimize total distance
-    
     const maxPossibleAssigned = clusters.reduce(
       (sum, cluster) => sum + cluster.requests.length, 
       0
@@ -419,11 +456,20 @@ export class GeneticMatcher implements IMatchingStrategy {
     const assignmentRatio = totalAssigned / maxPossibleAssigned;
     const normalizedDetour = Math.min(totalDetour / (totalAssigned || 1) / constraints.maxDetourKm, 1);
     
-    // Fitness function weights
-    const w1 = 0.7; // Assignment ratio weight
-    const w2 = 0.3; // Detour minimization weight
+    // Calculate vehicle utilization penalty
+    const usedVehicles = vehicleAssignments.size;
+    const totalVehicles = vehicles.length;
+    const vehicleUtilization = usedVehicles / totalVehicles;
     
-    return w1 * assignmentRatio - w2 * normalizedDetour;
+    // Strongly penalize unused vehicles
+    const unusedVehiclePenalty = (totalVehicles - usedVehicles) * 0.1;
+    
+    // Fitness function weights - prioritize assignment ratio and vehicle utilization
+    const w1 = 0.8; // Assignment ratio weight (increased from 0.7)
+    const w2 = 0.15; // Detour minimization weight (decreased from 0.3)
+    const w3 = 0.05; // Vehicle utilization weight (new)
+    
+    return w1 * assignmentRatio - w2 * normalizedDetour + w3 * vehicleUtilization - unusedVehiclePenalty;
   }
   
   /**
@@ -517,5 +563,148 @@ export class GeneticMatcher implements IMatchingStrategy {
     }
     
     return assignments;
+  }
+
+  /**
+   * Post-process solution to assign idle vehicles to unassigned clusters
+   * This improves passenger matching by utilizing all available vehicles
+   */
+  private postProcessSolution(
+    solution: number[], 
+    clusters: Cluster[], 
+    vehicles: Vehicle[], 
+    constraints: { maxDetourKm: number }
+  ): number[] {
+    const improvedSolution = [...solution];
+    
+    // Track vehicle capacity
+    const availableSeats = vehicles.map(v => v.availableSeats);
+    
+    // Calculate used capacity from current assignments
+    for (let i = 0; i < improvedSolution.length; i++) {
+      const vehicleIndex = improvedSolution[i];
+      if (vehicleIndex >= 0) {
+        const clusterSize = clusters[i].requests.length;
+        availableSeats[vehicleIndex] -= clusterSize;
+      }
+    }
+    
+    // Find unassigned clusters
+    const unassignedClusters: number[] = [];
+    for (let i = 0; i < improvedSolution.length; i++) {
+      if (improvedSolution[i] === -1) {
+        unassignedClusters.push(i);
+      }
+    }
+    
+    // Find idle vehicles (with full capacity)
+    const idleVehicles: number[] = [];
+    for (let i = 0; i < vehicles.length; i++) {
+      if (availableSeats[i] === vehicles[i].availableSeats) {
+        idleVehicles.push(i);
+      }
+    }
+    
+    // Sort unassigned clusters by size (larger clusters first for better efficiency)
+    unassignedClusters.sort((a, b) => clusters[b].requests.length - clusters[a].requests.length);
+    
+    // Try to assign idle vehicles to unassigned clusters
+    for (const clusterIndex of unassignedClusters) {
+      const cluster = clusters[clusterIndex];
+      const clusterSize = cluster.requests.length;
+      
+      // Find the best idle vehicle for this cluster
+      let bestVehicleIndex = -1;
+      let bestDistance = Infinity;
+      
+      for (const vehicleIndex of idleVehicles) {
+        const vehicle = vehicles[vehicleIndex];
+        
+        // Check capacity constraint
+        if (vehicle.availableSeats < clusterSize) continue;
+        
+        // Check distance constraint (with some flexibility)
+        const distance = haversineDistance(vehicle.location, cluster.centroid);
+        
+        // Allow slightly longer distances for better matching (1.5x the constraint)
+        if (distance <= constraints.maxDetourKm * 1.5 && distance < bestDistance) {
+          bestVehicleIndex = vehicleIndex;
+          bestDistance = distance;
+        }
+      }
+      
+      // Assign the best vehicle if found
+      if (bestVehicleIndex !== -1) {
+        improvedSolution[clusterIndex] = bestVehicleIndex;
+        availableSeats[bestVehicleIndex] -= clusterSize;
+        
+        // Remove vehicle from idle list if it's now fully utilized
+        if (availableSeats[bestVehicleIndex] === 0) {
+          const idleIndex = idleVehicles.indexOf(bestVehicleIndex);
+          if (idleIndex !== -1) {
+            idleVehicles.splice(idleIndex, 1);
+          }
+        }
+      }
+    }
+    
+    // If we still have idle vehicles and unassigned clusters, try more aggressive assignment
+    const remainingUnassigned = improvedSolution.filter(assignment => assignment === -1).length;
+    if (idleVehicles.length > 0 && remainingUnassigned > 0) {
+      this.aggressiveAssignment(improvedSolution, clusters, vehicles, availableSeats, idleVehicles, constraints);
+    }
+    
+    return improvedSolution;
+  }
+  
+  /**
+   * More aggressive assignment for remaining idle vehicles
+   * Uses relaxed constraints to maximize passenger matching
+   */
+  private aggressiveAssignment(
+    solution: number[],
+    clusters: Cluster[],
+    vehicles: Vehicle[],
+    availableSeats: number[],
+    idleVehicles: number[],
+    constraints: { maxDetourKm: number }
+  ): void {
+    // Find remaining unassigned clusters
+    const unassignedClusters: number[] = [];
+    for (let i = 0; i < solution.length; i++) {
+      if (solution[i] === -1) {
+        unassignedClusters.push(i);
+      }
+    }
+    
+    // Sort by cluster size (larger first)
+    unassignedClusters.sort((a, b) => clusters[b].requests.length - clusters[a].requests.length);
+    
+    for (const clusterIndex of unassignedClusters) {
+      const cluster = clusters[clusterIndex];
+      const clusterSize = cluster.requests.length;
+      
+      // Find any idle vehicle that can serve this cluster
+      for (const vehicleIndex of idleVehicles) {
+        const vehicle = vehicles[vehicleIndex];
+        
+        // Check capacity constraint
+        if (vehicle.availableSeats < clusterSize) continue;
+        
+        // Very relaxed distance constraint (2x the original)
+        const distance = haversineDistance(vehicle.location, cluster.centroid);
+        if (distance <= constraints.maxDetourKm * 2.0) {
+          solution[clusterIndex] = vehicleIndex;
+          availableSeats[vehicleIndex] -= clusterSize;
+          
+          // Remove vehicle from idle list
+          const idleIndex = idleVehicles.indexOf(vehicleIndex);
+          if (idleIndex !== -1) {
+            idleVehicles.splice(idleIndex, 1);
+          }
+          break;
+        }
+      }
+    }
   }
 } 

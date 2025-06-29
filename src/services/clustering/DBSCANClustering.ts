@@ -42,8 +42,13 @@ export class DBSCANClustering implements IClusterStrategy {
     }
     
     // DBSCAN parameters - adjusted for more realistic clustering
-    const epsilon = 0.22; // Epsilon defines the radius of the neighborhood (adjusted for more realistic clusters)
+    // Make epsilon more flexible based on the number of requests
+    const baseEpsilon = 0.22;
+    const adaptiveEpsilon = Math.min(baseEpsilon * (1 + filteredRequests.length / 100), 0.35);
+    const epsilon = adaptiveEpsilon; // Epsilon defines the radius of the neighborhood
     const minPoints = 2; // Minimum points in a neighborhood to form a cluster
+    
+    console.log(`DBSCAN Parameters: epsilon=${epsilon.toFixed(3)}, minPoints=${minPoints}, requests=${filteredRequests.length}`);
     
     // Initialize clusters and classification array
     const clusters: Cluster[] = [];
@@ -106,6 +111,8 @@ export class DBSCANClustering implements IClusterStrategy {
       .filter(item => item.val === this.NOISE)
       .map(item => item.idx);
     
+    console.log(`DBSCAN Results: ${clusterId} clusters, ${noiseIndices.length} noise points out of ${filteredRequests.length} total requests`);
+    
     for (const idx of noiseIndices) {
       const request = filteredRequests[idx];
       clusters.push({
@@ -114,6 +121,8 @@ export class DBSCANClustering implements IClusterStrategy {
         requests: [request]
       });
     }
+    
+    console.log(`Final clusters: ${clusters.length} total (${clusterId} multi-passenger + ${noiseIndices.length} single-passenger)`);
     
     return clusters;
   }
@@ -231,10 +240,9 @@ export class DBSCANClustering implements IClusterStrategy {
     );
     
     // Normalize distances to [0, 1] range
-    const normalizedSpatialDistance = Math.min(
-      spatialDistance / Math.min(this.MAX_SPATIAL_DISTANCE_KM, maxDistanceKm), 
-      1
-    );
+    // Use a more flexible spatial normalization for ride-sharing
+    const spatialThreshold = Math.min(this.MAX_SPATIAL_DISTANCE_KM, maxDistanceKm);
+    const normalizedSpatialDistance = Math.min(spatialDistance / spatialThreshold, 1);
     
     const normalizedTemporalDistance = Math.min(
       temporalDistance / this.MAX_TEMPORAL_DISTANCE_MIN, 
@@ -242,7 +250,14 @@ export class DBSCANClustering implements IClusterStrategy {
     );
     
     // Combine spatial and temporal distances (with spatial having more weight)
-    // Weight distribution: 80% spatial, 20% temporal (increased spatial weight for clustered data)
-    return (normalizedSpatialDistance * 0.8) + (normalizedTemporalDistance * 0.2);
+    // Weight distribution: 80% spatial, 20% temporal
+    const combinedDistance = (normalizedSpatialDistance * 0.8) + (normalizedTemporalDistance * 0.2);
+    
+    // Debug logging for distance calculation
+    if (spatialDistance < 0.5 && temporalDistance < 5) {
+      console.log(`Distance calculation: spatial=${spatialDistance.toFixed(3)}km, temporal=${temporalDistance.toFixed(1)}min, combined=${combinedDistance.toFixed(3)}`);
+    }
+    
+    return combinedDistance;
   }
 } 
