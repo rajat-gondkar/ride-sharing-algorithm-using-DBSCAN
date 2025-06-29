@@ -50,35 +50,6 @@ The Dynamic Ride-Sharing Simulator addresses the complex challenge of matching m
 - **Mutation**: Random gene mutation with 0.1 probability
 - **Fitness Function**: Minimizes total distance while respecting constraints
 
-**Genetic Algorithm Components**:
-
-#### Chromosome Representation
-```typescript
-// Each chromosome represents a vehicle-to-cluster assignment
-type Chromosome = {
-  assignments: number[]; // vehicleId -> clusterId mapping
-  fitness: number;
-}
-```
-
-#### Fitness Function
-```typescript
-fitness = totalDistance + penaltyForConstraints
-// Constraints include:
-// - Vehicle capacity limits
-// - Maximum detour distances
-// - Time window compatibility
-```
-
-#### Evolution Process
-1. **Initialization**: Generate random population of assignments
-2. **Evaluation**: Calculate fitness for each chromosome
-3. **Selection**: Choose parents using tournament selection
-4. **Crossover**: Create offspring by combining parent assignments
-5. **Mutation**: Randomly modify some assignments
-6. **Replacement**: Replace worst individuals with new offspring
-7. **Convergence**: Repeat until optimal solution found
-
 ### 3. Routing Algorithm
 
 **Current Implementation**: Straight-line routing for simplicity
